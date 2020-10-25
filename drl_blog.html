@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="viewport" content="width=device-width">
+<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.3/styles/default.min.css">
+<link href="css/custom.css" rel="stylesheet"/>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']]
+  },
+  svg: {
+    fontCache: 'global'
+  },
+  tex: {
+    tags: 'all'
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+
+<body>
+<div class="jumbotron">
+  <div class="container">
+    <h1>Deep Reinforcement Learning</h1>
+    <h1>for impatient Physicist</h1>
+  </div>
+</div>
+
+<div class="container">
+
+<p>
+This long article will explain to you what Deep Reinforment Learning is all about and we will teach you the
+theory and implementation from scratch. 
+</p>
+    
+<h2>The Goal of Reinforcement Learning</h2>
+<p>
+Essentially Reinforcement Learning is a special class of Probability Graphical Model with the joint probability:
+\begin{align}
+P_{\theta}(s_1, a_1, \ldots, s_T, a_T) = P(s_1) \prod_{t=1}^{T} \pi_{\theta}(a_t \vert s_t) P(s_{t+1} \vert s_t, a_t)
+\end{align}
+where \(\pi_{\theta}(a_t \vert s_t)\) is called a policy, which is just conditional probability 
+of \(a_t\) given \(s_t\).
+The transition probability from \(s_t, a_t\) to \(s_{t+1}\) is given by \(P(s_{t+1} \vert s_t, a_t)\). 
+I am just going to spoil the game for you by telling you that 99% of the time we do not know both
+the policy and transition probability.  
+The goal of the game is to maximize the sum of the rewards:
+\begin{align}
+\theta^* &= \mathop{\text{arg max}}_{\theta} J(\theta)
+=\mathop{\text{arg max}}_{\theta} \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \sum_{t}
+\gamma^t  r(s_t, a_t) \right],
+\end{align}
+with the term \(\gamma\) as discount factor.
+You are free to do whatever you want, for instance learning a policy, estimating transition probability or
+expectation value of rewards. Whatever you do, your goal is to maximize the total rewardr by interacting
+with the environment.
+Let us try to directly optimise the objective above, and see how far can we go. 
+</p>
+
+<h2>Policy Gradient</h2>
+<p>
+So the first thing a physicist would do when he or she encountered the expectation term is to convert it
+to sample mean:
+\begin{align}
+J(\theta) &= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \sum_{t} \gamma^t r(s_t, a_t) \right]
+\approx \frac{1}{N} \sum_{i=1}^{N} \sum_{t=1}^{T} \gamma^t r(s_{i,t}, a_{i,t})
+\end{align}
+Notice that when you sample your trajectory to get the rewards, you need to follow your current policy. 
+Let us denote the sum of all rewards as \(r(\tau)\). 
+Let us switch back to formal definition of expectation and apply gradient operator to \(J(\theta)\):
+\begin{align}
+\nabla_{\theta} J(\theta) &= \int \nabla_{\theta} P_{\theta}(\tau) r(\tau) d\tau \\
+&= \int P_{\theta} \nabla_{\theta} \log P_{\theta}(\tau) r(\tau) d\tau \\
+&= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \nabla_{\theta} \log P_{\theta}(\tau) r(\tau)\right] \\
+&= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \left( \sum_{t=1}^{T} \nabla_{\theta}
+\log \pi_{\theta}(a_t \vert s_t) \right) \left( \sum_{t=1}^{T} \gamma^t r(s_t, a_t) \right) \right] 
+\label{eq:simplify} \\
+&\approx \frac{1}{N}\sum_{i=1}^{N} \left( \sum_{t=1}^{T} \nabla_{\theta}
+\log \pi_{\theta}(a_{i,t} \vert s_{i,t}) \right) \left( \sum_{t=1}^{T} \gamma^t r(s_{i,t}, a_{i,t}) \right).\\ 
+\label{eq:grad}
+&\equiv \frac{1}{N}\sum_{i=1}^{N} \sum_{t=1}^{T} \nabla_{\theta}
+\log \pi_{\theta}(a_{i,t} \vert s_{i,t}) \Psi_t. 
+\end{align}
+In the second step we have used the identity \(\nabla \log A = \nabla A / A \).
+Note that as only the policy depends on \(\theta\), only its derivative survives inside the \(P_{\theta}\) 
+term, hence the simplification in eq.\eqref{eq:simplify}. 
+We replace the sample mean back in the expectation term in eq.\eqref{eq:grad} .
+Once we have the gradient term, we can update the parameter \(\theta\). 
+Notice that we have replace the sum of rewards with a more generalized function \(\Psi_t\),
+which will become convenient later. 
+We obtain our first Reinforcement Learning algorithm, the REINFORCE algorithm, which can be summarized 
+by the following steps:
+<div class="card bg-light mb-3">
+<div class="card-body">
+<div class="card-header">REINFORCE algorithm</div>
+  <ol>
+    <li>Sample the trajectory from a fixed policy.</li>
+    <li>Obtain \(\nabla_{\theta} J(\theta)\) from the equation \eqref{eq:grad}.</li>
+    <li>\( \theta \leftarrow \theta + \alpha  \nabla_{\theta} J(\theta) \)</li>
+  </ol>
+</div>
+</div>
+We have our first example of an on-policy algorithm. 
+On-policy means that I have to stick to my current policy when I sample a trajectory with fixed \(\theta\).
+Old trajectories from previous policy, i.e. different \(\theta\) should be discarded. 
+We can see from step 1 of REINFORCE that this step is unavoidable. 
+</p>
+
+<p>
+I should stress that if you compare the terms in eq.\eqref{eq:grad} with loss function in supervised learning,
+the \(\nabla_{\theta} \log \pi_{\theta} \) term dictates the changes in policy, while the reward term controls
+the magnitude of the backpropagation. 
+You can think of it as a variable learning rate, and you prefer to correct the parameter  \( \theta \) to collect
+more rewards. 
+As mentioned before, policy is just a probability distribution.
+We can take a simple Gaussian distribution defined as 
+\( \pi_{\theta}(a_t \vert s_t) = \mathcal{N}(f(s_t);\Sigma) \) where \(f \) is typically a neural network.
+</p>
+
+<h4>Problem with Variance</h4>
+<p>
+Sadly, REINFORCE does not work most of the time. 
+The problem lies in the reward term in eq.\eqref{eq:grad}.
+In supervised learning we do not have that extra term as the gradient dictates the change of parameter that
+we should undertake to improve our model. 
+In RL the convergence of the vanilla policy gradient defined above depends sensitively on \(r(\tau) \).
+Unfortunately different use cases have different rewards.
+One extreme example would be to have a situation where good examples have zero reward. 
+The system will have hard time to learn the from good samples. 
+What we need to do is to normalize the sum of reward so that the good example will have positive reward,
+while the bad example should have negative reward, i.e. 
+\begin{align}
+\Psi = \sum_{t=1}^T \gamma^t r(s_{i,t}, a_{i,t}) - \text{something}.
+\end{align}
+We can take a constant \(b\) as a simple "something" for baseline comparison. 
+Why we are allowed to subtract something in eq.\eqref{eq:grad}? 
+I will leave it as an excercise for you.
+We can further simplify the sum by noting that policy at future time should not affect the reward at time \(t\).
+This is just a simple causality analysis and has nothing to do with Markov process.
+Let us update eq.\eqref{eq:grad}:
+\begin{align}
+\nabla_{\theta} J(\theta) &\approx \frac{1}{N}\sum_{i=1}^{N} \left( \sum_{t=1}^{T} \nabla_{\theta}
+\log \pi_{\theta}(a_{i,t} \vert s_{i,t}) \right) \left( \sum_{t'=t}^{T} \gamma^{t'-t} r(s_{i,t'}, a_{i,t'}) 
+-b\right). \label{eq:grad2}
+\end{align}
+This term \( \sum_{t'=t}^{T} \gamma^{t'-t} r(s_{i,t'}, a_{i,t'})-b \) is unbiased, but has high variance
+single-sample estimate. 
+Note that the discount factor only discount the reward, but not the gradient.
+In some sense we are not doing the true discount as future action should matter less than current action,
+and we should really discount the term \(\pi_{\theta}(a_t \vert s_t)\).
+However in practise we want our agent to run forever and hence all action should be equally important. 
+Therefore only the reward is discounted.
+</p>
+
+<h2>Actor-Critic</h2>
+<p>
+The reward term in eq.\eqref{eq:grad2} is based on single sample trajectory, which means the variance is 
+still large.
+It would be more desirable to average out the rewards from more sample trajectories.
+Ideally we want to replace the term:
+\begin{align}
+\sum_{t'=t}^T \gamma^{t'-t}r(s_{t'}, a_{t'}) \rightarrow 
+\sum_{t'=t}^T \mathbb{E}_{\pi_{\theta}} \left[ \gamma^{t'-t}r(s_{t'}, a_{t'}) \vert s_{t}, a_{t} \right]
+\equiv Q^{\pi}(s_t, a_t), \label{eq:saf}
+\end{align}
+with the expected reward-to-go, also known as <i>State-action value</i> or Q-function.
+It represents the total reward obtained by taking action \(a_t\) in state \(s_t\).
+Notice the supercript \(\pi \) for the State-action value function, as \(Q(s_t, a_t)\) has a fixed policy.
+If we accept such a proposal, then we should also improve our baseline in eq.\eqref{eq:grad2}.
+As mentioned before that the baseline serves like an average of the reward, perhaps we can just average all 
+the actions that can be taken in \(Q^{\pi}(s_t, a_t) \), defined as the 
+<i>State Value</i> function or just <i>Value</i> function:
+\begin{align}
+V^{\pi}(s_t) \equiv \mathop{\mathbb{E}}_{a_t \sim \pi_{\theta}(a_t \vert s_t)} \left[Q^{\pi}(s_t, a_t) \right].
+\label{eq:value}
+\end{align}
+The Value function represents the total reward from state \(s_t\) and can be used as baseline.
+The difference between State-action value and the Value function is called Advantage function:
+\begin{align}
+A^{\pi}(s_t, a_t) = Q^{\pi}(s_t, a_t) - V^{\pi}(s_t).
+\end{align}
+I should stress that the Value function is independent of action, as we have averaged out all actions for a 
+given state.
+Our new gradient function has now the following form:
+\begin{align}
+\nabla_{\theta} J(\theta) &\approx \frac{1}{N}\sum_{i=1}^{N} \sum_{t=1}^{T} \nabla_{\theta}
+\log \pi_{\theta}(a_{i,t} \vert s_{i,t}) A^{\pi}(s_{i,t}, a_{i,t}). \label{eq:grad3}
+\end{align}
+The Advantage function is any function that you can introduce to lower the variance, 
+if it can estimate the reward better. 
+It will give crappy results if it is not good in predicting the reward.
+Notice however that as we have introduced an approximator in our equation, we have also introduced biases
+in eq.\eqref{eq:grad3}. 
+</p>
+
+<p>
+It is easier to fit the Value function as it only depends on the state.
+The less argument your function has, the easier it will learn.
+Let us manipulate eq.\eqref{eq:saf} to manifest the value function:
+\begin{align}
+Q^{\pi}(s_t, a_t) &= 
+\sum_{t'=t}^T \mathbb{E}_{\pi_{\theta}} \left[ \gamma^{t'-t} r(s_{t'}, a_{t'}) \vert s_{t}, a_{t} 
+\right] \label{eq:saf1} \\
+&= r(s_t, a_t) + 
+\sum_{t'=t+1}^T \mathbb{E}_{\pi_{\theta}} \left[ \gamma^{t'-t} r(s_{t'}, a_{t'}) \vert s_{t}, a_{t} \right] 
+\label{eq:saf2}\\
+&= r(s_t, a_t) +
+\gamma \mathop{\mathbb{E}}_{s_{t+1} \sim P(s_{t+1} \vert s_t, a_t)} \left[ V^{\pi}(s_{t+1}) \right] 
+\label{eq:saf3}\\
+&\approx r(s_t, a_t) + \gamma V^{\pi}(s_{t+1}). \label{eq:saf4}
+\end{align}
+Because \(s_t,a_t\) is known at time \(t\), we can take out the reward at time \(t\) out of the expectation,
+hence eq.\eqref{eq:saf2}.
+Using eq.\eqref{eq:value}, we can see that eq.\eqref{eq:saf2} can be written as eq.\eqref{eq:saf3},
+which is still exact. 
+Now we approximate that for state \(s_{t+1}\), we take only 1 sample instead of averaging the Value function
+for all state at \(t+1\), which is in eq.\eqref{eq:saf4}.
+Note that we still take the expectation for state on \(t+2\) onwards. 
+The reason for this simplification is to have the Advantage function depending only on the Value function:
+\begin{align}
+A^{\pi}(s_t, a_t) \approx r(s_t,a_t) +\gamma V^{\pi}(s_{t+1}) - V^{\pi}(s_t). \label{eq:adv}
+\end{align}
+Now we can just fit the Value function. 
+</p>
+
+<h4>Policy Evaluation</h4>
+<p>
+Ideally at a fixed state \(s_t\), we want to sum all the rewards accumulated from that state onwards with multiple
+sample trajectories. 
+However, most of the time you cannot roll back your environment to the exact state \(s_t\) to generate 
+another sample trajectory, unless you are using a simulator. 
+That is why we will use a function approximator \(\hat{V}^{\pi}_{\phi}(s_i) \) like neural network
+with parameter \(\phi\) as Value function.
+The assumption we have made here is that the neural network will generate trajectories that are close 
+to the fixed \(s_t\).
+Naively we generate the training data pair \({(s_{i,t}, \sum_{t'=t}^T \gamma^{t'-t}r(s_{i,t'}, a_{i,t'}))} \) 
+and minimize the error:
+\begin{align}
+\mathcal{L}(\phi) = \frac{1}{2} \sum_i \left\lVert \hat{V}^{\pi}_{\phi}(s_i) - \sum_{t'=t}^T \gamma^{t'-t}
+r(s_{i,t'}, a_{i,t'}) \right\rVert^2. \label{eq:loss1}
+\end{align} 
+Instead of using full trajectories, we can bootstrap the approximator by plugging it back during sampling of 
+training data. 
+We would have the training set \({(s_{i,t}, r(s_{i,t}, a_{i,t})+ \gamma\hat{V}^{\pi}_{\phi}(s_{i, t+1}))} \) 
+to minimize 
+\begin{align}
+\mathcal{L}(\phi) = \frac{1}{2} \sum_i \left\lVert \hat{V}^{\pi}_{\phi}(s_i) - 
+r(s_{i,t'}, a_{i,t'}) - \gamma \hat{V}^{\pi}_{\phi'}(s_{i, t+1}) \right\rVert^2. \label{eq:loss2}
+\end{align} 
+The parameter \(\phi'\) represents the value from previous fit.
+Now we can use the function approximator \(\hat{V}^{\pi}_{\phi}(s_i) \) to sample summed reward.
+The batch <i>Actor-Critic</i> algorithm is defined as below:
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Batch Actor-Critic Algorithm</div>
+  <ol>
+    <li>Sample the trajectory from a fixed policy \(\pi_{\theta}(a \vert s)\).</li>
+    <li>Fit \(\hat{V}^{\pi}_{\phi}(s_i) \) by minimizing eq.\eqref{eq:loss1} or eq.\eqref{eq:loss2}.</li>
+    <li>Evaluate the Advantage function eq.\eqref{eq:adv} by replacing the Value function with 
+        \(\hat{V}^{\pi}_{\phi}(s_i) \)</li>
+    <li>Obtain \(\nabla_{\theta} J(\theta)\) from the equation \eqref{eq:grad3}.</li>
+    <li>\( \theta \leftarrow \theta + \alpha  \nabla_{\theta} J(\theta) \).</li>
+    <li>Repeat step 1 till 5.</li>
+  </ol>
+</div>
+</div>
+We can also use the online version of this algorithm, where we only take an action 
+\(a\sim \pi_{\theta}(a \vert s)\) to get one tuple of \((s,a,s',r)\) and run through the algorithm above
+with one sample. 
+The convergence is typically poor when we have neural network for the policy and critic. 
+This problem can be ameliorated with parallel workers for step 1, and we update the neural network parameters
+\(\phi\) and \(\theta\) by averaging the losses from all the sample. 
+</p>
+
+<h4>Critic as Baseline</h4>
+<p>
+Let us compare the \(\Psi\) term for Actor-Critic model and policy gradient.
+<div class="row">
+ <div class="col-sm-6">
+  <div class="card bg-light mb-3">
+   <div class="class-body">
+    <div class="card-header">Actor-Critic</div>
+     \begin{align}
+     \Psi_t = r(s_{i,t}, a_{i,t}) + \gamma \hat{V}^{\pi}_{\phi}(s_{i,t+1}) - \hat{V}^{\pi}_{\phi}(s_{i,t})
+     \nonumber
+     \end{align}
+     <ul>
+      <li>Lower variance</li>
+      <li>Bias if critic is not perfect</li>
+     </ul>
+   </div>
+  </div>
+ </div>
+ <div class="col-sm-6">
+  <div class="card bg-light mb-3">
+   <div class="class-body">
+    <div class="card-header">Policy Gradient</div>
+     \begin{align}
+     \Psi_t = \sum_{t'=t}^T \gamma^{t'-t} r(s_{i,t'}, a_{i,t'}) -b
+     \nonumber
+     \end{align}
+     <ul>
+      <li>Unbiased</li>
+      <li>High variance due to single-sample</li>
+     </ul>
+   </div>
+  </div>
+ </div>
+</div>
+It would be nice to combine both the advantages from Actor-Critic and policy gradient, to have:
+\begin{align}
+\Psi_t = \sum_{t'=t}^T \gamma^{t'-t} r(s_{i,t'}, a_{i,t'}) - \hat{V}^{\pi}_{\phi}(s_{i,t}).\label{eq:genrew}
+\end{align}
+The eq.\eqref{eq:genrew} enables us to lower variance with bias tradeoff. 
+Heuristically we know that state and action not far from current state \(s_t\) will be more or less similar,
+while the variance is large the further we move to the future. 
+Therefore we can use the single-sample estimate up to time \(n>1\) and then use the critic 
+to estimate the rest:
+\begin{align}
+\Psi_t(n) = \sum_{t'=t}^{t+n} \gamma^{t'-t} r(s_{i,t'}, a_{i,t'}) 
++ \gamma^n \hat{V}^{\pi}_{\phi}(s_{i,t+n})
+- \hat{V}^{\pi}_{\phi}(s_{i,t}).\label{eq:genrew2}
+\end{align}
+Why stop here with just 1 fixed n? 
+We can sum all \(\Psi_t(n) \) weighted with exponential falloff \(w_n \sim \lambda^{n-1}\) to obtain
+the Generalized Advantage Estimation:
+\begin{align}
+\Psi_t^{\text{GAE}} = \sum_{t'=t}^{\infty}(\gamma \lambda)^{t'-t}
+\left( r(s_{i,t'}, a_{i,t'})
++ \gamma \hat{V}^{\pi}_{\phi}(s_{i,t'+1})
+- \hat{V}^{\pi}_{\phi}(s_{i,t'}) \right).\label{eq:gengae}
+\end{align}
+This advantage function massively reduces variance by reducing lambda.
+In some sense it shows that the discount factor is also reducing variance, as one can redefine
+\(\hat{\gamma} = \gamma \lambda\) to be our new discount factor. 
+</p>
+
+</div>
+
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.3/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+</body>
+</html>
