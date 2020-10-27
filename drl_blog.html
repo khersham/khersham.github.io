@@ -29,7 +29,7 @@ MathJax = {
 <div class="jumbotron">
   <div class="container">
     <h1>Deep Reinforcement Learning</h1>
-    <h1>for impatient Physicist</h1>
+    <h3>from scratch</h3>
   </div>
 </div>
 
@@ -38,6 +38,8 @@ MathJax = {
 <p>
 This long article will explain to you what Deep Reinforment Learning is all about and we will teach you the
 theory and implementation from scratch. 
+This article summarizes lecture <a href="http://rail.eecs.berkeley.edu/deeprlcourse/">CS285</a> from UCLA Berkeley,
+and I strongly recommend you to watch the lecture for more in depth explanation. 
 </p>
     
 <h2>The Goal of Reinforcement Learning</h2>
@@ -340,6 +342,103 @@ the Generalized Advantage Estimation:
 This advantage function massively reduces variance by reducing lambda.
 In some sense it shows that the discount factor is also reducing variance, as one can redefine
 \(\hat{\gamma} = \gamma \lambda\) to be our new discount factor. 
+</p>
+
+<h2>Value Function Method</h2>
+<p>
+From batch Actor-Critic algorithm we notice that we use the Advantage function \(A^{\pi}(s_t,a_t)\)
+as the generalized reward \(\Psi_t\) for the policy gradient. 
+If we can choose the best action that maximizes \(A^{\pi}(s_t, a_t)\), we could just forget about 
+taking gradient, and just take update our policy using that action.
+Let us just define a new policy that is as good as policy \(\pi(a_t \vert s_t)\) with:
+\begin{align}
+\pi'(a_t \vert s_t) = \begin{cases}
+    1, \, a_t = \mathop{\text{arg max}}_{a_t} A^{\pi}(s_t, a_t) \\
+    0, \, \text{otherwise.}
+    \end{cases}
+\end{align}
+The idea of evaluating the Advantage function and setting the new policy according to the best action is 
+called <i>Policy Iteration</i>.
+
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Policy Iteration</div>
+  <ol>
+    <li>Evaluate \(A^{\pi}(s,a) = r(s,a) + \gamma \underset{s'}{\mathbb{E}}[V^{\pi}(s')] - V^{\pi}(s)\).</li>
+    <li>Set \(\pi \leftarrow \pi'\)</li>
+  </ol>
+</div>
+</div>
+
+If we assume that we know the transition probability \(P(s' \vert s, a)\) and we have small discrete set
+of state and action, we can bootstrap the update of Value function:
+\begin{align}
+V^{\pi}(s) \leftarrow \mathop{\mathbb{E}}_{a\sim\pi(a \vert s)} \left[ r(s,a) +
+\gamma \mathop{\mathbb{E}}_{s'\sim P(s' \vert s,a)} \left[ V^{\pi}(s')\right] \right],
+\end{align}
+where we just use the current Value function on the r.h.s.of the equation above. 
+The process is called <i>Policy Evaluation</i>.
+Recall that the State-action value is \(Q^{\pi}(s,a) = r(s,a) + \gamma \mathbb{E}[V^{\pi}(s')] \)
+and taking the arg max of Advantage function is the same as taking the arg max of State-action function,
+as the Value function is independent of action.  
+</p>
+
+<p>
+Can we skip the policy directly? As we can see that we just need to update \(V(s)\) and \(Q(s,a)\).
+Policy is just an intermediate step. 
+Hence instead of taking the arg max of State-action function, we just the the max of \(Q(s,a)\) directly.
+We obtain the <i>Value Iteration algorithm</i>:
+
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Value Iteration</div>
+  <ol>
+    <li>Evaluate \(Q(s,a) \leftarrow r(s,a) + \gamma \underset{s'}{\mathbb{E}}[V^{\pi}(s')] \).</li>
+    <li>Set \(V(s) \leftarrow \underset{a}{\max} Q(s,a) \)</li>
+  </ol>
+</div>
+</div>
+Fun fact, physicist often uses fields to describe interation between particles. 
+Often, one can skip the field completely and describe the interation of one particle as a function 
+of another particle.
+This type of model often does not manifest the causality structure and hence tends to produce
+"action-at-instance" effect. 
+Newtonian gravity theory falls under this class, while Einstein general relativity requires gravitation
+field. 
+</p>
+
+<h4>Fitting Value Function or State-action Function</h4>
+<p>
+Normally the number of state is gigantic and we cannot calculate \(V(s)\) by brute force.
+We need to somehow approximate the Value function, and neural network is a good candidate.
+Suppose we have \(V\) as neural network with parameter \(\phi\), we can have <i>Fitted Value Iteration 
+algorithm</i> as follows:
+
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Fitted Value Iteration</div>
+  <ol>
+    <li>Set \(y_i \leftarrow \underset{a}{\max} (r(s_i,a_i) + \gamma \underset{s'_i}{\mathbb{E}}
+     [V_{\phi}(s'_i)] ) \).</li>
+    <li>Set \(\phi \leftarrow \underset{\phi}{\text{arg max}} \frac{1}{2} \underset{i}{\sum} \lVert
+      V_{\phi}(s_i) - y_i \rVert^2 \).</li>
+  </ol>
+</div>
+</div>
+The problem with (Fitted) Value Iteration is that we need to know the transition probability so that
+we can sample from it in the expectation.
+Also the max function requires you to have multiple action at current state, hence you need to 
+keep resetting your agent back to this fixed state to retake another action, unless 
+you know the transition probability. 
+Perhaps if we have a policy again, we can ameliorate parts of the problem. 
+Let us just perform policy evaluation on \(Q^{\pi}(s,a) \) instead of \(V^{\pi}(s) \):
+\begin{align}
+Q^{\pi}(s,a) \leftarrow r(s,a) + \gamma \underset{s'}{\mathbb{E}}[Q^{\pi}(s', \pi(s')].
+\end{align}
+Now we can fit the above function using samples that can be obtained from another policy. 
+Since I use policy \(\pi\) in \(Q^{\pi}\) on the r.h.s., I can treat my data tuple \((s,a,s')\)
+independent of policy, and reuse them in the expectation calculation.
+We do not need to know the transition probabilities, just the sample \((s,a,s')\). 
 </p>
 
 </div>
