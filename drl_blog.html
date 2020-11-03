@@ -441,6 +441,86 @@ independent of policy, and reuse them in the expectation calculation.
 We do not need to know the transition probabilities, just the sample \((s,a,s')\). 
 </p>
 
+<p>
+Can we have Fitted Value Iteration method for the State-action function? 
+Yes it is possible, when we approximate 
+\(\mathbb{E}[V_{\phi}(s'_i)] \approx \max_{a'}Q_{\phi}(s'_i, a'_i) \) in Fitted Value Iteration.
+We obtain the Fitted Q Iteration algorithm:
+
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Fitted Q Iteration</div>
+  <ol>
+    <li>Collect dataset \({(s_i, a_i, s'_i, r_i)}\) using some policy.</li>
+    <li>Set \(y_i \leftarrow r(s_i,a_i) + \gamma \underset{a'}{\max} Q_{\phi}(s'_i, a'_i)  \).</li>
+    <li>Set \(\phi \leftarrow \underset{\phi}{\text{arg max}} \frac{1}{2} \underset{i}{\sum} \lVert
+      Q_{\phi}(s_i, a_i) - y_i \rVert^2 \).</li>
+    <li>Repeat step 2 and 3 for \(K\) times.</li>
+    <li>Repeat step 1.</li>
+  </ol>
+</div>
+</div>
+The convergence is not guaranteed when you use function approximator like neural network for \(Q\).
+Notice that like Fitted Value Iteration, we can use off policy sample, which is not the case in Actor-Critic.
+In step 2 the max function is improving the policy, as you can think of \(Q\) as a model that gives 
+you different value when you take different action.
+Taking the best action means improving the policy.
+Step 3 is required to improve the parameters \(\phi\).
+If \(K=1\), we would have the online version of the algorithm. 
+Note that you may not want to use the greedy algorithm if you are using the online Q Iteration algorithm.
+Intuitively your baby robot will learn only to crawl and cannot learn to walk if you apply greedy algorithm,
+as it will just take the steps that maximise its reward, which likely to be crawling at the beginning of
+the learning phase.
+It will never want to explore alternatives that might reap higher rewards.
+We can impose a small probability \(\epsilon\) that the agent will explore, and \(1-\epsilon\) for the agent
+to follow greedy algorithm. 
+We will come to exploration later.
+</p>
+
+<h2>Q-Learning</h2>
+<p>
+What could go wrong with our online Fitted Q iteration method above?
+First of all, step 3 in online Fitted Q Iteration is not gradient descent, as \(y_i\) contains the term
+\(Q_{\phi}(s'_i, a'_i\), which we did not take into account in gradient descent.
+Or in software term, the backprop of parameter \(\phi\) does not flow through \(y_i\).
+</p>
+
+<p>
+Second problem that we have is that the dataset \((s_i, a_i, s'_i, r_i)\) is generally correlated,
+as your next data pair will be very close to your current state. 
+However recall that stochastic gradient descent requires i.i.d. dataset!
+Your fit will be always optimised to your previous dataset, it can never learn to generalize.
+Updating your neural network parameter with 1 sample is generally a bad idea, as the convergence of the
+gradient descent is typically poor. 
+As a solution we could use multiple workers to generate different \((s_i, a_i, s'_i, r_i)\), and update the 
+parameter \(\phi\) by averaging the gradient. 
+Alternatively we can use replay buffer, where we simply ignore step 1 in
+Fitted Q Iteration. 
+We just load some transition from a buffer, and we do not care where they come from. 
+Ideally we should load data with diverse configuration of transition so that the whole configuration space
+is covered.
+Typically we do not just load a replay buffer with god given transitions, but rather we use a policy 
+to collect some trajectories by interacting with the environment, load the buffer and 
+train our algorithm. 
+After some iterations, we use the latest policy with probability of deviation for exploring to collect new
+trajectories.
+We then have the <i>Q-Learning</i> algorithm:
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Q-Learning with replay buffer</div>
+  <ol>
+    <li>Collect dataset \({(s_i, a_i, s'_i, r_i)}\) using some policy, add to buffer.</li>
+    <li>Sample a batch \({(s_i, a_i, s'_i, r_i)}\) from the buffer. </li>
+    <li>Set \(\phi \leftarrow \underset{\phi}{\text{arg max}} \frac{1}{2} \underset{i}{\sum} \lVert
+      Q_{\phi}(s_i, a_i) - y_i \rVert^2 \).</li>
+    <li>Repeat step 2 and 3 for \(K\) times.</li>
+    <li>Repeat step 1.</li>
+  </ol>
+</div>
+</div>
+
+</p>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
