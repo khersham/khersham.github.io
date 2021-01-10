@@ -34,54 +34,60 @@ MathJax = {
 </div>
 
 <div class="container">
-
+<div class="mb-2">
 <p>
 This long article will explain to you what Deep Reinforment Learning is all about and we will teach you the
 theory and implementation from scratch. 
 This article summarizes lecture <a href="http://rail.eecs.berkeley.edu/deeprlcourse/">CS285</a> from UCLA Berkeley,
-and I strongly recommend you to watch the lecture for more in depth explanation. 
+and I strongly recommend you to watch the lecture for more in depth explanations. 
 </p>
-    
+</div>
+   
+<div class="mb-5"> 
 <h2>The Goal of Reinforcement Learning</h2>
 <p>
 Essentially Reinforcement Learning is a special class of Probability Graphical Model with the joint probability:
 \begin{align}
-P_{\theta}(s_1, a_1, \ldots, s_T, a_T) = P(s_1) \prod_{t=1}^{T} \pi_{\theta}(a_t \vert s_t) P(s_{t+1} \vert s_t, a_t)
+p_{\theta}(s_1, a_1, \ldots, s_T, a_T) = p(s_1) \prod_{t=1}^{T} \pi_{\theta}(a_t \vert s_t) p(s_{t+1} \vert s_t, a_t)
 \end{align}
 where \(\pi_{\theta}(a_t \vert s_t)\) is called a policy, which is just conditional probability 
-of \(a_t\) given \(s_t\).
-The transition probability from \(s_t, a_t\) to \(s_{t+1}\) is given by \(P(s_{t+1} \vert s_t, a_t)\). 
+of action \(a_t\) given a state \(s_t\) at time \(t\).
+The transition probability from \(s_t, a_t\) to \(s_{t+1}\) is given by \(p(s_{t+1} \vert s_t, a_t)\). 
 I am just going to spoil the game for you by telling you that 99% of the time we do not know both
 the policy and transition probability.  
 The goal of the game is to maximize the sum of the rewards:
 \begin{align}
 \theta^* &= \mathop{\text{arg max}}_{\theta} J(\theta)
-=\mathop{\text{arg max}}_{\theta} \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \sum_{t}
+=\mathop{\text{arg max}}_{\theta} \mathop{\mathbb{E}}_{\tau \sim p_{\theta}(\tau)} \left[ \sum_{t}
 \gamma^t  r(s_t, a_t) \right],
 \end{align}
 with the term \(\gamma\) as discount factor.
-You are free to do whatever you want, for instance learning a policy, estimating transition probability or
-expectation value of rewards. Whatever you do, your goal is to maximize the total rewardr by interacting
-with the environment.
-Let us try to directly optimise the objective above, and see how far can we go. 
 </p>
+<p>
+Your goal is to maximize the total reward by interacting with the environment.
+You are free to do whatever you want, for instance learning a policy, estimating transition probability or
+expectation value of rewards.
+Let us try to directly optimize the objective above, and see how far can we go. 
+</p>
+</div>
 
+<div class="mb-5">
 <h2>Policy Gradient</h2>
 <p>
 So the first thing a physicist would do when he or she encountered the expectation term is to convert it
 to sample mean:
 \begin{align}
-J(\theta) &= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \sum_{t} \gamma^t r(s_t, a_t) \right]
+J(\theta) &= \mathop{\mathbb{E}}_{\tau \sim p_{\theta}(\tau)} \left[ \sum_{t} \gamma^t r(s_t, a_t) \right]
 \approx \frac{1}{N} \sum_{i=1}^{N} \sum_{t=1}^{T} \gamma^t r(s_{i,t}, a_{i,t})
 \end{align}
 Notice that when you sample your trajectory to get the rewards, you need to follow your current policy. 
 Let us denote the sum of all rewards as \(r(\tau)\). 
 Let us switch back to formal definition of expectation and apply gradient operator to \(J(\theta)\):
 \begin{align}
-\nabla_{\theta} J(\theta) &= \int \nabla_{\theta} P_{\theta}(\tau) r(\tau) d\tau \\
-&= \int P_{\theta} \nabla_{\theta} \log P_{\theta}(\tau) r(\tau) d\tau \\
-&= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \nabla_{\theta} \log P_{\theta}(\tau) r(\tau)\right] \\
-&= \mathop{\mathbb{E}}_{\tau \sim P_{\theta}(\tau)} \left[ \left( \sum_{t=1}^{T} \nabla_{\theta}
+\nabla_{\theta} J(\theta) &= \int \nabla_{\theta} p_{\theta}(\tau) r(\tau) d\tau \\
+&= \int p_{\theta} \nabla_{\theta} \log p_{\theta}(\tau) r(\tau) d\tau \\
+&= \mathop{\mathbb{E}}_{\tau \sim p_{\theta}(\tau)} \left[ \nabla_{\theta} \log p_{\theta}(\tau) r(\tau)\right] \\
+&= \mathop{\mathbb{E}}_{\tau \sim p_{\theta}(\tau)} \left[ \left( \sum_{t=1}^{T} \nabla_{\theta}
 \log \pi_{\theta}(a_t \vert s_t) \right) \left( \sum_{t=1}^{T} \gamma^t r(s_t, a_t) \right) \right] 
 \label{eq:simplify} \\
 &\approx \frac{1}{N}\sum_{i=1}^{N} \left( \sum_{t=1}^{T} \nabla_{\theta}
@@ -91,14 +97,15 @@ Let us switch back to formal definition of expectation and apply gradient operat
 \log \pi_{\theta}(a_{i,t} \vert s_{i,t}) \Psi_t. 
 \end{align}
 In the second step we have used the identity \(\nabla \log A = \nabla A / A \).
-Note that as only the policy depends on \(\theta\), only its derivative survives inside the \(P_{\theta}\) 
+Note that as only the policy depends on \(\theta\), only its derivative survives inside the \(p_{\theta}\) 
 term, hence the simplification in eq.\eqref{eq:simplify}. 
 We replace the sample mean back in the expectation term in eq.\eqref{eq:grad} .
 Once we have the gradient term, we can update the parameter \(\theta\). 
-Notice that we have replace the sum of rewards with a more generalized function \(\Psi_t\),
+Notice that we have replaced the sum of rewards with a more generalized function \(\Psi_t\),
 which will become convenient later. 
 We obtain our first Reinforcement Learning algorithm, the REINFORCE algorithm, which can be summarized 
 by the following steps:
+</p>
 <div class="card bg-light mb-3">
 <div class="card-body">
 <div class="card-header">REINFORCE algorithm</div>
@@ -109,8 +116,9 @@ by the following steps:
   </ol>
 </div>
 </div>
+<p>
 We have our first example of an on-policy algorithm. 
-On-policy means that I have to stick to my current policy when I sample a trajectory with fixed \(\theta\).
+On-policy means that we have to stick to our current policy when we sample a trajectory with fixed \(\theta\).
 Old trajectories from previous policy, i.e. different \(\theta\) should be discarded. 
 We can see from step 1 of REINFORCE that this step is unavoidable. 
 </p>
@@ -119,13 +127,15 @@ We can see from step 1 of REINFORCE that this step is unavoidable.
 I should stress that if you compare the terms in eq.\eqref{eq:grad} with loss function in supervised learning,
 the \(\nabla_{\theta} \log \pi_{\theta} \) term dictates the changes in policy, while the reward term controls
 the magnitude of the backpropagation. 
-You can think of it as a variable learning rate, and you prefer to correct the parameter  \( \theta \) to collect
-more rewards. 
+You can think of it as a variable learning rate, and you prefer to correct the parameter  \( \theta \) 
+to collect more rewards. 
 As mentioned before, policy is just a probability distribution.
 We can take a simple Gaussian distribution defined as 
 \( \pi_{\theta}(a_t \vert s_t) = \mathcal{N}(f(s_t);\Sigma) \) where \(f \) is typically a neural network.
 </p>
+</div>
 
+<div class="mb-5">
 <h4>Problem with Variance</h4>
 <p>
 Sadly, REINFORCE does not work most of the time. 
@@ -135,7 +145,7 @@ we should undertake to improve our model.
 In RL the convergence of the vanilla policy gradient defined above depends sensitively on \(r(\tau) \).
 Unfortunately different use cases have different rewards.
 One extreme example would be to have a situation where good examples have zero reward. 
-The system will have hard time to learn the from good samples. 
+The system will have hard time learning from good samples. 
 What we need to do is to normalize the sum of reward so that the good example will have positive reward,
 while the bad example should have negative reward, i.e. 
 \begin{align}
@@ -143,7 +153,9 @@ while the bad example should have negative reward, i.e.
 \end{align}
 We can take a constant \(b\) as a simple "something" for baseline comparison. 
 Why we are allowed to subtract something in eq.\eqref{eq:grad}? 
-I will leave it as an excercise for you.
+One can show that the gradient of the sum or integral of probability density function vanishes as
+the integral \(\int p_{\theta}(\tau) d\tau = 1\).
+Hence we are basically subtracting a zero in eq.\eqref{eq:grad}.
 We can further simplify the sum by noting that policy at future time should not affect the reward at time \(t\).
 This is just a simple causality analysis and has nothing to do with Markov process.
 Let us update eq.\eqref{eq:grad}:
@@ -157,13 +169,15 @@ single-sample estimate.
 Note that the discount factor only discount the reward, but not the gradient.
 In some sense we are not doing the true discount as future action should matter less than current action,
 and we should really discount the term \(\pi_{\theta}(a_t \vert s_t)\).
-However in practise we want our agent to run forever and hence all action should be equally important. 
+However in practice we want our agent to run forever and hence all action should be equally important. 
 Therefore only the reward is discounted.
 </p>
+</div>
 
+<div class="mb-5">
 <h2>Actor-Critic</h2>
 <p>
-The reward term in eq.\eqref{eq:grad2} is based on single sample trajectory, which means the variance is 
+The reward term in eq.\eqref{eq:grad2} is based on single sample trajectory, which means that the variance is 
 still large.
 It would be more desirable to average out the rewards from more sample trajectories.
 Ideally we want to replace the term:
@@ -190,6 +204,10 @@ A^{\pi}(s_t, a_t) = Q^{\pi}(s_t, a_t) - V^{\pi}(s_t).
 \end{align}
 I should stress that the Value function is independent of action, as we have averaged out all actions for a 
 given state.
+To my fellow physicist friends, I notice that the Advantage function has a form of Lagrangian
+in classical mechanics, with the Q-function acting as kinetic energy term while the Value function
+acting as the potential term. 
+Would be great if we can take a look at the analogy closely next time.
 Our new gradient function has now the following form:
 \begin{align}
 \nabla_{\theta} J(\theta) &\approx \frac{1}{N}\sum_{i=1}^{N} \sum_{t=1}^{T} \nabla_{\theta}
@@ -214,13 +232,13 @@ Q^{\pi}(s_t, a_t) &=
 \sum_{t'=t+1}^T \mathbb{E}_{\pi_{\theta}} \left[ \gamma^{t'-t} r(s_{t'}, a_{t'}) \vert s_{t}, a_{t} \right] 
 \label{eq:saf2}\\
 &= r(s_t, a_t) +
-\gamma \mathop{\mathbb{E}}_{s_{t+1} \sim P(s_{t+1} \vert s_t, a_t)} \left[ V^{\pi}(s_{t+1}) \right] 
+\gamma \mathop{\mathbb{E}}_{s_{t+1} \sim p(s_{t+1} \vert s_t, a_t)} \left[ V^{\pi}(s_{t+1}) \right] 
 \label{eq:saf3}\\
 &\approx r(s_t, a_t) + \gamma V^{\pi}(s_{t+1}). \label{eq:saf4}
 \end{align}
 Because \(s_t,a_t\) is known at time \(t\), we can take out the reward at time \(t\) out of the expectation,
 hence eq.\eqref{eq:saf2}.
-Using eq.\eqref{eq:value}, we can see that eq.\eqref{eq:saf2} can be written as eq.\eqref{eq:saf3},
+By using eq.\eqref{eq:value}, we can see that eq.\eqref{eq:saf2} can be written as eq.\eqref{eq:saf3},
 which is still exact. 
 Now we approximate that for state \(s_{t+1}\), we take only 1 sample instead of averaging the Value function
 for all state at \(t+1\), which is in eq.\eqref{eq:saf4}.
@@ -231,7 +249,9 @@ A^{\pi}(s_t, a_t) \approx r(s_t,a_t) +\gamma V^{\pi}(s_{t+1}) - V^{\pi}(s_t). \l
 \end{align}
 Now we can just fit the Value function. 
 </p>
+</div>
 
+<div class="mb-5">
 <h4>Policy Evaluation</h4>
 <p>
 Ideally at a fixed state \(s_t\), we want to sum all the rewards accumulated from that state onwards with multiple
@@ -259,6 +279,7 @@ r(s_{i,t'}, a_{i,t'}) - \gamma \hat{V}^{\pi}_{\phi'}(s_{i, t+1}) \right\rVert^2.
 The parameter \(\phi'\) represents the value from previous fit.
 Now we can use the function approximator \(\hat{V}^{\pi}_{\phi}(s_i) \) to sample summed reward.
 The batch <i>Actor-Critic</i> algorithm is defined as below:
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Batch Actor-Critic Algorithm</div>
@@ -273,6 +294,7 @@ The batch <i>Actor-Critic</i> algorithm is defined as below:
   </ol>
 </div>
 </div>
+<p>
 We can also use the online version of this algorithm, where we only take an action 
 \(a\sim \pi_{\theta}(a \vert s)\) to get one tuple of \((s,a,s',r)\) and run through the algorithm above
 with one sample. 
@@ -280,10 +302,13 @@ The convergence is typically poor when we have neural network for the policy and
 This problem can be ameliorated with parallel workers for step 1, and we update the neural network parameters
 \(\phi\) and \(\theta\) by averaging the losses from all the sample. 
 </p>
+</div>
 
+<div class="mb-5">
 <h4>Critic as Baseline</h4>
 <p>
 Let us compare the \(\Psi\) term for Actor-Critic model and policy gradient.
+</p>
 <div class="row">
  <div class="col-sm-6">
   <div class="card bg-light mb-3">
@@ -316,6 +341,7 @@ Let us compare the \(\Psi\) term for Actor-Critic model and policy gradient.
   </div>
  </div>
 </div>
+<p>
 It would be nice to combine both the advantages from Actor-Critic and policy gradient, to have:
 \begin{align}
 \Psi_t = \sum_{t'=t}^T \gamma^{t'-t} r(s_{i,t'}, a_{i,t'}) - \hat{V}^{\pi}_{\phi}(s_{i,t}).\label{eq:genrew}
@@ -343,23 +369,25 @@ This advantage function massively reduces variance by reducing lambda.
 In some sense it shows that the discount factor is also reducing variance, as one can redefine
 \(\hat{\gamma} = \gamma \lambda\) to be our new discount factor. 
 </p>
+</div>
 
+<div class="mb-5">
 <h2>Value Function Method</h2>
 <p>
 From batch Actor-Critic algorithm we notice that we use the Advantage function \(A^{\pi}(s_t,a_t)\)
 as the generalized reward \(\Psi_t\) for the policy gradient. 
 If we can choose the best action that maximizes \(A^{\pi}(s_t, a_t)\), we could just forget about 
-taking gradient, and just take update our policy using that action.
-Let us just define a new policy that is as good as policy \(\pi(a_t \vert s_t)\) with:
+taking gradient, and just update our policy using that action.
+Let us define a new policy that is as good as policy \(\pi(a_t \vert s_t)\) with:
 \begin{align}
 \pi'(a_t \vert s_t) = \begin{cases}
-    1, \, a_t = \mathop{\text{arg max}}_{a_t} A^{\pi}(s_t, a_t) \\
+    1, \, a_t = \mathop{\text{arg max}}\limits_{a_t} A^{\pi(s_t, a_t)} \\
     0, \, \text{otherwise.}
     \end{cases}
 \end{align}
 The idea of evaluating the Advantage function and setting the new policy according to the best action is 
 called <i>Policy Iteration</i>.
-
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Policy Iteration</div>
@@ -369,12 +397,12 @@ called <i>Policy Iteration</i>.
   </ol>
 </div>
 </div>
-
-If we assume that we know the transition probability \(P(s' \vert s, a)\) and we have small discrete set
+<p>
+If we assume that we know the transition probability \(p(s' \vert s, a)\) and we have small discrete set
 of state and action, we can bootstrap the update of Value function:
 \begin{align}
 V^{\pi}(s) \leftarrow \mathop{\mathbb{E}}_{a\sim\pi(a \vert s)} \left[ r(s,a) +
-\gamma \mathop{\mathbb{E}}_{s'\sim P(s' \vert s,a)} \left[ V^{\pi}(s')\right] \right],
+\gamma \mathop{\mathbb{E}}_{s'\sim p(s' \vert s,a)} \left[ V^{\pi}(s')\right] \right],
 \end{align}
 where we just use the current Value function on the r.h.s.of the equation above. 
 The process is called <i>Policy Evaluation</i>.
@@ -388,7 +416,7 @@ Can we skip the policy directly? As we can see that we just need to update \(V(s
 Policy is just an intermediate step. 
 Hence instead of taking the arg max of State-action function, we just the the max of \(Q(s,a)\) directly.
 We obtain the <i>Value Iteration algorithm</i>:
-
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Value Iteration</div>
@@ -398,6 +426,7 @@ We obtain the <i>Value Iteration algorithm</i>:
   </ol>
 </div>
 </div>
+<p>
 Fun fact, physicist often uses fields to describe interation between particles. 
 Often, one can skip the field completely and describe the interation of one particle as a function 
 of another particle.
@@ -406,14 +435,16 @@ This type of model often does not manifest the causality structure and hence ten
 Newtonian gravity theory falls under this class, while Einstein general relativity requires gravitation
 field. 
 </p>
+</div>
 
+<div class="mb-5">
 <h4>Fitting Value Function or State-action Function</h4>
 <p>
 Normally the number of state is gigantic and we cannot calculate \(V(s)\) by brute force.
 We need to somehow approximate the Value function, and neural network is a good candidate.
 Suppose we have \(V\) as neural network with parameter \(\phi\), we can have <i>Fitted Value Iteration 
 algorithm</i> as follows:
-
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Fitted Value Iteration</div>
@@ -425,6 +456,7 @@ algorithm</i> as follows:
   </ol>
 </div>
 </div>
+<p>
 The problem with (Fitted) Value Iteration is that we need to know the transition probability so that
 we can sample from it in the expectation.
 Also the max function requires you to have multiple action at current state, hence you need to 
@@ -436,8 +468,8 @@ Let us just perform policy evaluation on \(Q^{\pi}(s,a) \) instead of \(V^{\pi}(
 Q^{\pi}(s,a) \leftarrow r(s,a) + \gamma \underset{s'}{\mathbb{E}}[Q^{\pi}(s', \pi(s')].
 \end{align}
 Now we can fit the above function using samples that can be obtained from another policy. 
-Since I use policy \(\pi\) in \(Q^{\pi}\) on the r.h.s., I can treat my data tuple \((s,a,s')\)
-independent of policy, and reuse them in the expectation calculation.
+Since we use policy \(\pi\) in \(Q^{\pi}\) on the r.h.s., we can treat the data tuple \((s,a,s')\)
+as independent of policy, and reuse them in the expectation calculation.
 We do not need to know the transition probabilities, just the sample \((s,a,s')\). 
 </p>
 
@@ -446,7 +478,7 @@ Can we have Fitted Value Iteration method for the State-action function?
 Yes it is possible, when we approximate 
 \(\mathbb{E}[V_{\phi}(s'_i)] \approx \max_{a'}Q_{\phi}(s'_i, a'_i) \) in Fitted Value Iteration.
 We obtain the Fitted Q Iteration algorithm:
-
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Fitted Q Iteration</div>
@@ -460,6 +492,7 @@ We obtain the Fitted Q Iteration algorithm:
   </ol>
 </div>
 </div>
+<p>
 The convergence is not guaranteed when you use function approximator like neural network for \(Q\).
 Notice that like Fitted Value Iteration, we can use off policy sample, which is not the case in Actor-Critic.
 In step 2 the max function is improving the policy, as you can think of \(Q\) as a model that gives 
@@ -476,12 +509,15 @@ We can impose a small probability \(\epsilon\) that the agent will explore, and 
 to follow greedy algorithm. 
 We will come to exploration later.
 </p>
+</div>
 
+
+<div class="mb-5">
 <h2>Q-Learning</h2>
 <p>
 What could go wrong with our online Fitted Q iteration method above?
 First of all, step 3 in online Fitted Q Iteration is not gradient descent, as \(y_i\) contains the term
-\(Q_{\phi}(s'_i, a'_i\), which we did not take into account in gradient descent.
+\(Q_{\phi}(s'_i, a'_i) \), which we did not take into account in gradient descent.
 Or in software term, the backprop of parameter \(\phi\) does not flow through \(y_i\).
 </p>
 
@@ -505,22 +541,86 @@ train our algorithm.
 After some iterations, we use the latest policy with probability of deviation for exploring to collect new
 trajectories.
 We then have the <i>Q-Learning</i> algorithm:
+</p>
 <div class="card">
 <div class="card-body bg-light mb-3">
 <div class="card-header">Q-Learning with replay buffer</div>
   <ol>
     <li>Collect dataset \({(s_i, a_i, s'_i, r_i)}\) using some policy, add to buffer.</li>
     <li>Sample a batch \({(s_i, a_i, s'_i, r_i)}\) from the buffer. </li>
-    <li>Set \(\phi \leftarrow \underset{\phi}{\text{arg max}} \frac{1}{2} \underset{i}{\sum} \lVert
-      Q_{\phi}(s_i, a_i) - y_i \rVert^2 \).</li>
+    <li>Set \(\phi \leftarrow \phi - \alpha \sum\limits_{i} \frac{dQ_{\phi}}{d\phi} \left(
+        Q_{\phi}(s_i, a_i) - \left[ r(s_i, a_i) + \gamma \max\limits_{a'}Q_{\phi}(s'_i, a'_i)
+        \right] \right)  \).</li>
     <li>Repeat step 2 and 3 for \(K\) times.</li>
     <li>Repeat step 1.</li>
   </ol>
 </div>
 </div>
-
+<p>
+Taking \(K=1\) and repeating the outer loop for every run will produce online version of 
+Q iteration algorithm.
 </p>
+</div>
 
+<div class="mb-5">
+<h4>Moving Target</h4>
+<p>
+The problem with the Q-learning algorithm above is that we have two \(Q_{\phi} \) appear in the equation.
+We want to optimize the parameter \(\phi\) but at the same time our target
+\(r(s_i, a_i) + \gamma \max_{a'}Q_{\phi}(s'_i, a'_i)\) is also using the parameter \(\phi\).
+We are essentially chasing our own tail. 
+One solution is to fix the parameter \(\phi = \phi'\) for the target, and only update it after some
+iterations. We update the Q-learning algorithm:
+</p>
+<div class="card">
+<div class="card-body bg-light mb-3">
+<div class="card-header">Q-Learning with replay buffer and target network</div>
+  <ol>
+    <li>Set target network parameters \(\phi' \leftarrow \phi\). </li>
+    <li>Collect dataset \({(s_i, a_i, s'_i, r_i)}\) using some policy, add to buffer.</li>
+    <li>Sample a batch \({(s_i, a_i, s'_i, r_i)}\) from the buffer. </li>
+    <li>Set \(\phi \leftarrow \phi - \alpha \sum\limits_{i} \frac{dQ_{\phi}}{d\phi} \left(
+        Q_{\phi}(s_i, a_i) - \left[ r(s_i, a_i) + \gamma \max \limits_{a'}Q_{\phi'}(s'_i, a'_i)
+        \right] \right)  \).</li>
+    <li>Repeat step 3 and 4 for \(K\) times.</li>
+    <li>Repeat step 2 after \(N\) times.</li>
+    <li>Repeat step 1 after \(M\) times.</li>
+  </ol>
+</div>
+</div>
+<p>
+Setting \(K=1\) and \(N=1\) will yield the classic Deep Q-learning (DQN) algorithm. 
+Note that the target network lags the current one by \(K\) times. 
+One can use Polyak averaging during the update of \(\phi\):
+\begin{align}
+\phi' \leftarrow \beta \phi' + (1-\beta) \phi.
+\end{align}
+
+In this case, the target network has same lag as for each iteration. 
+Whereas in the previous version of parameter update, the first iteration will use the newly updated parameter,
+and after \(M-1\) step, we are lagging far behind the target network. 
+</p>
+</div>
+
+<div class="mb-5">
+<h4>Generalization</h4>
+<p>
+If you stare at the Q-Learning with replay buffer and target network for long, you can notice that several step
+can be parallelized:
+<ol>
+<li>Process 1: Collect data with parallel workers with the current policy. Add the data to replay buffer.
+    Remember to evict old data in FIFO style.</li>
+<li>Process 2: Update the target network parameter \(\phi'\). Remember to boradcast it to all workers.</li>
+<li>Process 3: Sample some data batches from replay buffer and perform the Q-function regression 
+    to update the parameter \(\phi\).</li>
+</ol>
+For classic DQN, we have process 1 and 3 running at same speed, while process 2 occurs slowly.
+For online Q-learning, all processes run at same speed. 
+Having different processes to run at different rates can help Q-learning to converge effectively, 
+as every problem has different characters in terms of data and parameter, i.e. how fast can data or training 
+achieve stationarity. 
+</p>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
